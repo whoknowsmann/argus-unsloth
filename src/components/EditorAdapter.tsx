@@ -4,31 +4,33 @@ import { EditorView, type ViewUpdate } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { basicSetup } from 'codemirror';
+import type { ThemeMode } from '../types';
 
-const editorTheme = EditorView.theme(
-  {
-    '&': {
-      height: '100%',
-      backgroundColor: '#0f1115',
-      color: '#f5f5f5'
+const createEditorTheme = (themeMode: ThemeMode) =>
+  EditorView.theme(
+    {
+      '&': {
+        height: '100%',
+        backgroundColor: 'var(--editor-bg)',
+        color: 'var(--fg)'
+      },
+      '.cm-scroller': {
+        overflow: 'auto'
+      },
+      '.cm-content': {
+        padding: '16px',
+        fontSize: 'var(--editor-font-size, 14px)',
+        lineHeight: '1.5',
+        fontFamily: 'inherit'
+      },
+      '.cm-gutters': {
+        backgroundColor: 'var(--editor-bg)',
+        color: 'var(--muted)',
+        border: 'none'
+      }
     },
-    '.cm-scroller': {
-      overflow: 'auto'
-    },
-    '.cm-content': {
-      padding: '16px',
-      fontSize: 'var(--editor-font-size, 14px)',
-      lineHeight: '1.5',
-      fontFamily: 'inherit'
-    },
-    '.cm-gutters': {
-      backgroundColor: '#0f1115',
-      color: '#6b7280',
-      border: 'none'
-    }
-  },
-  { dark: true }
-);
+    { dark: themeMode === 'dark' }
+  );
 
 const findWikiLinkAt = (text: string, offset: number) => {
   const start = text.lastIndexOf('[[', offset);
@@ -55,9 +57,10 @@ type EditorAdapterProps = {
   value: string;
   onChange: (next: string) => void;
   onCtrlClickLink?: (linkText: string) => void;
+  themeMode: ThemeMode;
 };
 
-const EditorAdapter = ({ value, onChange, onCtrlClickLink }: EditorAdapterProps) => {
+const EditorAdapter = ({ value, onChange, onCtrlClickLink, themeMode }: EditorAdapterProps) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const ignoreNextChange = useRef(false);
@@ -112,7 +115,7 @@ const EditorAdapter = ({ value, onChange, onCtrlClickLink }: EditorAdapterProps)
         basicSetup,
         markdown({ codeLanguages: languages }),
         EditorView.lineWrapping,
-        editorTheme,
+        createEditorTheme(themeMode),
         EditorView.updateListener.of(handleUpdate),
         EditorView.domEventHandlers({
           mousedown: handleMouseDown
@@ -130,7 +133,7 @@ const EditorAdapter = ({ value, onChange, onCtrlClickLink }: EditorAdapterProps)
       view.destroy();
       viewRef.current = null;
     };
-  }, []);
+  }, [themeMode]);
 
   useEffect(() => {
     const view = viewRef.current;

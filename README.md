@@ -35,6 +35,30 @@ npm run dev
 - **Search indexing in main**: `MiniSearch` indexes title/content for fast global search without freezing the UI.
 - **Simple wikilink support**: `[[Note]]` and `[[Note|Alias]]` are converted to clickable links in preview.
 - **Autosave by default**: Debounced writes keep edits safe without a manual save button.
+- **Theme tokens**: UI colors are driven by CSS variables so light/dark themes can be swapped without per-component styling.
+
+## Theming (CSS Variables)
+
+Themes are defined via CSS variables on the `body` element (`theme-dark` or `theme-light`). Core tokens include:
+
+- `--bg`, `--fg`, `--muted`, `--border`, `--accent`
+- `--sidebar-bg`, `--panel-bg`, `--editor-bg`, `--tab-bg`
+
+All surfaces (sidebar, tabs, editor, preview, properties, backlinks, palette, graph view) read from these tokens so the theme can be changed globally. You can adjust the editor font size via the `--editor-font-size` variable as well.
+
+## Settings
+
+Settings live in the Electron user data directory at `settings.json` (via `app.getPath('userData')`). Current keys:
+
+- `theme`: `"dark"` or `"light"`
+- `editorFontSize`: numeric pixel value
+- `lastVault`: last opened vault path
+
+Updates are saved immediately when toggling theme or adjusting font size.
+
+## Graph View
+
+The Graph View shows a **local graph**: the current note plus its 1-hop neighbors (outgoing links and backlinks). It uses a lightweight SVG radial layout (no physics) and is meant to be fast. Use the top bar “Graph” button or the command palette command “Open Graph View” to open it.
 
 ## Key Logic Locations
 
@@ -88,15 +112,20 @@ list of affected paths.
 - If multiple notes share the same title, links resolve to the file the index currently maps to.
   During rename, only links that resolve to the exact file being renamed are rewritten.
 
-## Manual Test Checklist
+## Manual QA Checklist
 
-If you don't have automated tests handy, validate the rename flow with:
+If you don't have automated tests handy, validate these flows:
 
-- Rename a note that has backlinks.
-- Rename a note referenced with `[[Title|Alias]]`.
-- Rename a note referenced by `![[Embed]]`.
-- Move a note into a folder and confirm links still resolve.
-- Attempt a rename that conflicts with an existing file.
+1. Toggle the theme between dark/light and confirm all surfaces update.
+2. Adjust the editor font size slider and verify CodeMirror text updates immediately.
+3. Click “Change vault” in Settings and ensure the vault picker opens.
+4. Open the command palette and run “Open Graph View”.
+5. Click the top bar “Graph” button to open the graph modal.
+6. Click a graph node and confirm the note opens in a tab.
+7. Open a note, edit content, and verify autosave works (no data loss).
+8. Rename a note with backlinks and confirm links update.
+9. Move a note into a folder and confirm links still resolve.
+10. Switch tabs with Ctrl/Cmd + Tab and verify focus changes.
 
 ## Known Limitations
 
@@ -105,5 +134,4 @@ If you don't have automated tests handy, validate the rename flow with:
 
 ## Next Steps
 
-- Graph view for backlinks.
 - Smarter conflict handling if files are edited externally.

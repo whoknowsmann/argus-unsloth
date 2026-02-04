@@ -38,3 +38,27 @@ export type RenameApplyResult = {
 };
 
 export type ViewMode = 'split' | 'editor' | 'preview';
+
+export type ThemeMode = 'dark' | 'light';
+
+export type AppSettings = {
+  theme: ThemeMode;
+  editorFontSize: number;
+};
+
+export type GraphNode = {
+  path: string;
+  title: string;
+};
+
+export type GraphEdge = {
+  from: string;
+  to: string;
+};
+
+export type GraphData = {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  truncated?: boolean;
+  totalNodes?: number;
+};

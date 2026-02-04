@@ -8,12 +8,15 @@ import {
 } from 'react';
 import CommandPalette from './components/CommandPalette';
 import EditorPanel from './components/EditorPanel';
+import GraphView from './components/GraphView';
 import RenameModal, { type RenameFailureDetails } from './components/RenameModal';
 import RightSidebar from './components/RightSidebar';
+import SettingsModal from './components/SettingsModal';
 import Sidebar from './components/Sidebar';
 import TabBar from './components/TabBar';
 import TopBar from './components/TopBar';
 import type {
+  AppSettings,
   OpenNote,
   RenameApplyResult,
   RenamePreview,
@@ -30,6 +33,11 @@ import {
 } from './utils/notes';
 import { findNodeByPath } from './utils/tree';
 
+const defaultSettings: AppSettings = {
+  theme: 'dark',
+  editorFontSize: 14
+};
+
 const App = () => {
   const [vaultPath, setVaultPath] = useState<string | null>(null);
   const [tree, setTree] = useState<TreeNode[]>([]);
@@ -37,6 +45,9 @@ const App = () => {
   const [activePath, setActivePath] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [graphOpen, setGraphOpen] = useState(false);
+  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [lastUsedFolder, setLastUsedFolder] = useState<string | null>(null);
   const [backlinks, setBacklinks] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -347,6 +358,21 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    window.vaultApi.getSettings().then((saved) => {
+      if (!saved) {
+        return;
+      }
+      setSettings({ ...defaultSettings, ...(saved as AppSettings) });
+    });
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.remove('theme-dark', 'theme-light');
+    document.body.classList.add(`theme-${settings.theme}`);
+    document.documentElement.style.setProperty('--editor-font-size', `${settings.editorFontSize}px`);
+  }, [settings]);
+
+  useEffect(() => {
     if (!vaultPath) {
       return;
     }
@@ -451,6 +477,8 @@ const App = () => {
       <TopBar
         vaultPath={vaultPath}
         onSelectVault={handleVaultSelect}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenGraph={() => setGraphOpen(true)}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         searchResults={searchResults}
@@ -480,6 +508,7 @@ const App = () => {
             activeNote={activeNote}
             activeNode={activeNode}
             viewMode={viewMode}
+            themeMode={settings.theme}
             onUpdateContent={updateContent}
             onRename={renameEntry}
             onMove={moveEntry}
@@ -508,6 +537,24 @@ const App = () => {
         onTogglePreview={togglePreview}
         onToggleSplit={toggleSplit}
         onOpenDaily={openDailyNote}
+        onOpenGraph={() => setGraphOpen(true)}
+      />
+      <SettingsModal
+        open={settingsOpen}
+        settings={settings}
+        vaultPath={vaultPath}
+        onClose={() => setSettingsOpen(false)}
+        onUpdateSettings={(next) => {
+          setSettings(next);
+          window.vaultApi.updateSettings(next);
+        }}
+        onChangeVault={handleVaultSelect}
+      />
+      <GraphView
+        open={graphOpen}
+        activePath={activePath}
+        onClose={() => setGraphOpen(false)}
+        onOpenNote={openNoteByPath}
       />
     </div>
   );

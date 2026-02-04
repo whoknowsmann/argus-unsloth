@@ -1,7 +1,7 @@
 import { useMemo, type MouseEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { OpenNote, TreeNode, ViewMode } from '../types';
+import type { OpenNote, ThemeMode, TreeNode, ViewMode } from '../types';
 import { convertWikiLinks } from '../utils/notes';
 import EditorAdapter from './EditorAdapter';
 
@@ -9,6 +9,7 @@ type EditorPanelProps = {
   activeNote: OpenNote | null;
   activeNode: TreeNode | null;
   viewMode: ViewMode;
+  themeMode: ThemeMode;
   onUpdateContent: (path: string, content: string) => void;
   onRename: (node: TreeNode) => void;
   onMove: (node: TreeNode) => void;
@@ -39,6 +40,7 @@ const EditorPanel = ({
   activeNote,
   activeNode,
   viewMode,
+  themeMode,
   onUpdateContent,
   onRename,
   onMove,
@@ -71,6 +73,7 @@ const EditorPanel = ({
             value={activeNote.content}
             onChange={(next) => onUpdateContent(activeNote.path, next)}
             onCtrlClickLink={onOpenWikiLink}
+            themeMode={themeMode}
           />
         )}
         {(viewMode === 'split' || viewMode === 'preview') && (
