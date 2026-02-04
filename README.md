@@ -22,6 +22,17 @@ npm run dev
 - **Simple wikilink support**: `[[Note]]` and `[[Note|Alias]]` are converted to clickable links in preview.
 - **Autosave by default**: Debounced writes keep edits safe without a manual save button.
 
+## Command Palette + Quick Switcher
+
+Open the command palette with **Ctrl/Cmd + P**. From there you can:
+
+- **Open Note**: fuzzy-search note titles and press Enter to open.
+- **Create Note**: type a new title and press Enter to create in the vault root or last-used folder.
+- **Toggle Preview** / **Toggle Split View**.
+- **Open Daily Note**: opens today’s note (creates it if missing).
+
+While the palette is open, use ↑/↓ to navigate results and **Esc** to close.
+
 ## Known Limitations
 
 - Callouts are basic and only detect `> [!TYPE]`-style blockquotes.
@@ -30,6 +41,5 @@ npm run dev
 
 ## Next Steps
 
-- Command palette (open/create note).
 - Graph view for backlinks.
 - Smarter conflict handling if files are edited externally.

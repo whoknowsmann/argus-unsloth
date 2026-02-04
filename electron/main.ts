@@ -306,6 +306,14 @@ ipcMain.handle('search:query', async (_event, query: string) => {
   return results.slice(0, 50);
 });
 
+ipcMain.handle('note:searchTitles', async (_event, query: string) => {
+  if (!query.trim()) {
+    return [];
+  }
+  const results = searchIndex.search(query, { prefix: true, fuzzy: 0.2, fields: ['title'] });
+  return results.slice(0, 50);
+});
+
 ipcMain.handle('note:openByTitle', async (_event, title: string) => {
   const target = titleToPath.get(normalizeTitle(title));
   return target ?? null;
