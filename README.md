@@ -55,6 +55,20 @@ Open the command palette with **Ctrl/Cmd + P**. It opens in Quick Switcher mode 
 
 While the palette is open, use ↑/↓ to navigate results, **Esc** to close, and **Ctrl/Cmd + Enter** to open a note in a new tab.
 
+## Keyboard Shortcuts
+
+- **Ctrl/Cmd + P**: Open command palette (quick switcher).
+- **Ctrl/Cmd + N**: New note (creates in the selected folder if one is highlighted, otherwise in the vault root).
+- **Ctrl/Cmd + W**: Close current tab (prompts if a recent edit hasn't finished autosaving).
+- **Ctrl/Cmd + Tab**: Next tab.
+- **Ctrl/Cmd + Shift + Tab**: Previous tab.
+
+Note: **Ctrl/Cmd + W** and **Ctrl/Cmd + Tab** override their usual OS/browser behaviors within the app to manage tabs.
+
+## Editor
+
+The editor is powered by **CodeMirror 6** for lightweight, extensible Markdown syntax highlighting (including code fences) without the heavier footprint of Monaco. Line wrapping is enabled by default, and the editor font size can be styled via the `--editor-font-size` CSS variable for future settings support.
+
 ## Link Updates on Rename/Move
 
 When a note is renamed or moved, the app will scan the backlink graph to find every note that
