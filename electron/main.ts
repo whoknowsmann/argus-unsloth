@@ -41,6 +41,13 @@ type RenameApplyResult = {
 
 type Settings = {
   lastVault?: string;
+  theme?: 'dark' | 'light';
+  editorFontSize?: number;
+};
+
+const defaultSettings: Settings = {
+  theme: 'dark',
+  editorFontSize: 14
 };
 
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
@@ -84,19 +91,27 @@ const parseWikiLinks = (content: string) => {
 const loadSettings = async (): Promise<Settings> => {
   const filePath = settingsPath();
   if (!existsSync(filePath)) {
-    return {};
+    return { ...defaultSettings };
   }
   try {
     const raw = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(raw) as Settings;
+    const parsed = JSON.parse(raw) as Settings;
+    return { ...defaultSettings, ...parsed };
   } catch {
-    return {};
+    return { ...defaultSettings };
   }
 };
 
 const saveSettings = async (settings: Settings) => {
   await fs.mkdir(path.dirname(settingsPath()), { recursive: true });
   await fs.writeFile(settingsPath(), JSON.stringify(settings, null, 2), 'utf-8');
+};
+
+const updateSettings = async (partial: Settings) => {
+  const current = await loadSettings();
+  const next = { ...current, ...partial };
+  await saveSettings(next);
+  return next;
 };
 
 const createMainWindow = () => {
@@ -243,6 +258,41 @@ class VaultIndex {
       return [];
     }
     return Array.from(links);
+  }
+
+  getLocalGraph(filePath: string) {
+    const entry = this.notes.get(filePath);
+    if (!entry) {
+      return { nodes: [], edges: [] };
+    }
+    const nodes = new Map<string, { path: string; title: string }>();
+    const edges: { from: string; to: string }[] = [];
+    const addNode = (pathValue: string) => {
+      const note = this.notes.get(pathValue);
+      nodes.set(pathValue, {
+        path: pathValue,
+        title: note?.title ?? noteTitleFromPath(pathValue)
+      });
+    };
+    addNode(filePath);
+    const outgoingTargets = new Set<string>();
+    for (const link of entry.links) {
+      const targetPath = this.titleToPath.get(link);
+      if (!targetPath) {
+        continue;
+      }
+      outgoingTargets.add(targetPath);
+      addNode(targetPath);
+      edges.push({ from: filePath, to: targetPath });
+    }
+    const incoming = this.backlinks.get(filePath);
+    if (incoming) {
+      for (const sourcePath of incoming) {
+        addNode(sourcePath);
+        edges.push({ from: sourcePath, to: filePath });
+      }
+    }
+    return { nodes: Array.from(nodes.values()), edges };
   }
 
   // Get files that link to this path (for rename operations)
@@ -464,7 +514,7 @@ ipcMain.handle('vault:select', async () => {
   }
   vaultPath = result.filePaths[0];
   vaultIndex.setVaultPath(vaultPath);
-  await saveSettings({ lastVault: vaultPath });
+  await updateSettings({ lastVault: vaultPath });
   await vaultIndex.build();
   startWatcher();
   return vaultPath;
@@ -473,7 +523,7 @@ ipcMain.handle('vault:select', async () => {
 ipcMain.handle('vault:set', async (_event, newVaultPath: string) => {
   vaultPath = newVaultPath;
   vaultIndex.setVaultPath(vaultPath);
-  await saveSettings({ lastVault: vaultPath });
+  await updateSettings({ lastVault: vaultPath });
   await vaultIndex.build();
   startWatcher();
   return vaultPath;
@@ -615,6 +665,14 @@ ipcMain.handle('note:exists', async (_event, title: string) => {
 ipcMain.handle('backlinks:get', async (_event, filePath: string) => {
   return vaultIndex.getBacklinks(filePath);
 });
+
+ipcMain.handle('graph:local', async (_event, filePath: string) => {
+  return vaultIndex.getLocalGraph(filePath);
+});
+
+ipcMain.handle('settings:get', async () => loadSettings());
+
+ipcMain.handle('settings:update', async (_event, partial: Settings) => updateSettings(partial));
 
 ipcMain.handle('vault:hasDailyFolder', async () => {
   if (!vaultPath) {

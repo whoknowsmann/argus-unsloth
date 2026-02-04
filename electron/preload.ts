@@ -20,6 +20,10 @@ const api = {
   openByTitle: (title: string) => ipcRenderer.invoke('note:openByTitle', title),
   noteExists: (title: string) => ipcRenderer.invoke('note:exists', title),
   getBacklinks: (filePath: string) => ipcRenderer.invoke('backlinks:get', filePath),
+  getLocalGraph: (filePath: string) => ipcRenderer.invoke('graph:local', filePath),
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  updateSettings: (settings: Record<string, unknown>) =>
+    ipcRenderer.invoke('settings:update', settings),
   hasDailyFolder: () => ipcRenderer.invoke('vault:hasDailyFolder'),
   onVaultChanged: (callback: () => void) => {
     const handler = () => callback();

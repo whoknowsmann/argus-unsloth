@@ -4,6 +4,8 @@ import { ViewModeToggle } from './EditorPanel';
 type TopBarProps = {
   vaultPath: string | null;
   onSelectVault: () => void;
+  onOpenSettings: () => void;
+  onOpenGraph: () => void;
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
   searchResults: SearchResult[];
@@ -15,6 +17,8 @@ type TopBarProps = {
 const TopBar = ({
   vaultPath,
   onSelectVault,
+  onOpenSettings,
+  onOpenGraph,
   searchQuery,
   onSearchQueryChange,
   searchResults,
@@ -44,7 +48,11 @@ const TopBar = ({
         </div>
       )}
     </div>
-    <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} />
+    <div className="top-bar-actions">
+      <button onClick={onOpenGraph}>Graph</button>
+      <button onClick={onOpenSettings}>Settings</button>
+      <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} />
+    </div>
   </header>
 );
 

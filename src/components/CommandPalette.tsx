@@ -55,7 +55,8 @@ const CommandPalette = memo(
     onCreateNote,
     onTogglePreview,
     onToggleSplit,
-    onOpenDaily
+    onOpenDaily,
+    onOpenGraph
   }: {
     open: boolean;
     onClose: () => void;
@@ -64,6 +65,7 @@ const CommandPalette = memo(
     onTogglePreview: () => void;
     onToggleSplit: () => void;
     onOpenDaily: () => Promise<void>;
+    onOpenGraph: () => void;
   }) => {
     const [mode, setMode] = useState<PaletteMode>('open-note');
     const [query, setQuery] = useState('');
@@ -170,6 +172,15 @@ const CommandPalette = memo(
             await onOpenDaily();
             onClose();
           }
+        },
+        {
+          id: 'open-graph',
+          label: 'Open Graph View',
+          description: 'Show the local graph for the current note',
+          onSelect: () => {
+            onOpenGraph();
+            onClose();
+          }
         }
       ];
       if (!commandQuery.trim()) {
@@ -183,7 +194,7 @@ const CommandPalette = memo(
         .filter(({ score }) => score > 0)
         .sort((a, b) => b.score - a.score)
         .map(({ item }) => item);
-    }, [commandQuery, onClose, onOpenDaily, onTogglePreview, onToggleSplit, switchMode]);
+    }, [commandQuery, onClose, onOpenDaily, onOpenGraph, onTogglePreview, onToggleSplit, switchMode]);
 
     const noteItems = useMemo<PaletteListItem[]>(() => {
       if (mode !== 'open-note') {
