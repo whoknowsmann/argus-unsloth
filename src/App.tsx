@@ -41,6 +41,7 @@ const App = () => {
   const [backlinks, setBacklinks] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [selectedFolderPath, setSelectedFolderPath] = useState<string | null>(null);
   const [renamePlan, setRenamePlan] = useState<RenamePreview | null>(null);
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameApplying, setRenameApplying] = useState(false);
@@ -95,10 +96,10 @@ const App = () => {
   );
 
   const openNoteByTitle = useCallback(
-    async (title: string) => {
+    async (title: string, options?: { openInNewTab?: boolean }) => {
       const targetPath = await window.vaultApi.openByTitle(normalizeTitle(title));
       if (targetPath) {
-        await openNoteByPath(targetPath);
+        await openNoteByPath(targetPath, options);
         return;
       }
       const shouldCreate = window.confirm(`Create note "${title}"?`);
@@ -108,7 +109,7 @@ const App = () => {
       const filePath = `${vaultPath}/${title}.md`;
       await window.vaultApi.createFile(filePath, `# ${title}\n`);
       await loadTree();
-      await openNoteByPath(filePath);
+      await openNoteByPath(filePath, options);
     },
     [openNoteByPath, vaultPath, loadTree]
   );
@@ -132,6 +133,18 @@ const App = () => {
     },
     [vaultPath, lastUsedFolder, loadTree, openNoteByPath]
   );
+
+  const createNewNoteFromShortcut = useCallback(async () => {
+    if (!vaultPath) {
+      return;
+    }
+    const name = window.prompt('New note name');
+    if (!name) {
+      return;
+    }
+    const basePath = selectedFolderPath ?? vaultPath;
+    await createNoteWithTitle(name, { basePath });
+  }, [createNoteWithTitle, selectedFolderPath, vaultPath]);
 
   const openDailyNote = useCallback(async () => {
     const title = formatDailyTitle();
@@ -343,6 +356,10 @@ const App = () => {
   }, [vaultPath, loadTree]);
 
   useEffect(() => {
+    setSelectedFolderPath(null);
+  }, [vaultPath]);
+
+  useEffect(() => {
     loadBacklinks();
   }, [activePath, loadBacklinks]);
 
@@ -364,11 +381,45 @@ const App = () => {
       if ((event.metaKey || event.ctrlKey) && key === 'p') {
         event.preventDefault();
         setCommandPaletteOpen(true);
+        return;
+      }
+      if (!(event.metaKey || event.ctrlKey)) {
+        return;
+      }
+      if (key === 'n') {
+        event.preventDefault();
+        createNewNoteFromShortcut();
+        return;
+      }
+      if (key === 'w') {
+        event.preventDefault();
+        if (!activeNote) {
+          return;
+        }
+        if (activeNote.dirty) {
+          const shouldClose = window.confirm('Close tab? Unsaved changes may not be saved yet.');
+          if (!shouldClose) {
+            return;
+          }
+        }
+        closeTab(activeNote.path);
+        return;
+      }
+      if (key === 'tab') {
+        if (openNotes.length === 0) {
+          return;
+        }
+        event.preventDefault();
+        const currentIndex = openNotes.findIndex((note) => note.path === activePath);
+        const fallbackIndex = currentIndex === -1 ? 0 : currentIndex;
+        const step = event.shiftKey ? -1 : 1;
+        const nextIndex = (fallbackIndex + step + openNotes.length) % openNotes.length;
+        setActivePath(openNotes[nextIndex].path);
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+    window.addEventListener('keydown', handler, { capture: true });
+    return () => window.removeEventListener('keydown', handler, { capture: true });
+  }, [activeNote, activePath, createNewNoteFromShortcut, openNotes]);
 
   const togglePreview = useCallback(() => {
     setViewMode((prev) => (prev === 'preview' ? 'split' : 'preview'));
@@ -385,10 +436,14 @@ const App = () => {
     event?.preventDefault();
     const target = decodeURIComponent(href.replace('wikilink:', ''));
     if (event?.metaKey || event?.ctrlKey) {
-      await openNoteByTitle(target);
+      await openNoteByTitle(target, { openInNewTab: true });
       return;
     }
     await openNoteByTitle(target);
+  };
+
+  const handleEditorCtrlClick = async (linkText: string) => {
+    await openNoteByTitle(linkText, { openInNewTab: true });
   };
 
   return (
@@ -411,6 +466,8 @@ const App = () => {
           onMoveEntry={moveEntry}
           onDeleteEntry={deleteEntry}
           onCreateEntry={createNewEntry}
+          onSelectFolder={setSelectedFolderPath}
+          selectedFolderPath={selectedFolderPath}
         />
         <main className="main">
           <TabBar
@@ -427,6 +484,7 @@ const App = () => {
             onRename={renameEntry}
             onMove={moveEntry}
             onLinkClick={handleLinkClick}
+            onOpenWikiLink={handleEditorCtrlClick}
           />
         </main>
         <RightSidebar backlinks={backlinks} tree={tree} onOpenNote={openNoteByPath} />

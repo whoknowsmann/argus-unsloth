@@ -233,6 +233,15 @@ textarea {
   grid-template-columns: 1fr;
 }
 
+.editor-pane {
+  width: 100%;
+  height: 100%;
+}
+
+.editor-pane .cm-editor {
+  height: 100%;
+}
+
 textarea {
   width: 100%;
   height: 100%;
@@ -253,6 +262,10 @@ textarea {
 
 .preview a {
   color: #7aa2ff;
+}
+
+.tree-entry.selected {
+  background: #2a3143;
 }
 
 .callout {

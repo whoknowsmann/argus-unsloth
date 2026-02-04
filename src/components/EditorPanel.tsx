@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { OpenNote, TreeNode, ViewMode } from '../types';
 import { convertWikiLinks } from '../utils/notes';
+import EditorAdapter from './EditorAdapter';
 
 type EditorPanelProps = {
   activeNote: OpenNote | null;
@@ -12,6 +13,7 @@ type EditorPanelProps = {
   onRename: (node: TreeNode) => void;
   onMove: (node: TreeNode) => void;
   onLinkClick: (href?: string, event?: MouseEvent) => void;
+  onOpenWikiLink: (linkText: string) => void;
 };
 
 type ViewModeToggleProps = {
@@ -40,7 +42,8 @@ const EditorPanel = ({
   onUpdateContent,
   onRename,
   onMove,
-  onLinkClick
+  onLinkClick,
+  onOpenWikiLink
 }: EditorPanelProps) => {
   const markdownContent = useMemo(() => {
     if (!activeNote) {
@@ -64,9 +67,10 @@ const EditorPanel = ({
       </div>
       <div className={`editor-preview ${viewMode}`}>
         {(viewMode === 'split' || viewMode === 'editor') && (
-          <textarea
+          <EditorAdapter
             value={activeNote.content}
-            onChange={(event) => onUpdateContent(activeNote.path, event.target.value)}
+            onChange={(next) => onUpdateContent(activeNote.path, next)}
+            onCtrlClickLink={onOpenWikiLink}
           />
         )}
         {(viewMode === 'split' || viewMode === 'preview') && (

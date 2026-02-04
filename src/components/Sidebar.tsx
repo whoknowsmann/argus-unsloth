@@ -7,6 +7,8 @@ type SidebarProps = {
   onMoveEntry: (node: TreeNode) => void;
   onDeleteEntry: (node: TreeNode) => void;
   onCreateEntry: (type: 'file' | 'folder', parentPath?: string) => void;
+  onSelectFolder: (path: string | null) => void;
+  selectedFolderPath: string | null;
 };
 
 const Sidebar = ({
@@ -15,15 +17,23 @@ const Sidebar = ({
   onRenameEntry,
   onMoveEntry,
   onDeleteEntry,
-  onCreateEntry
+  onCreateEntry,
+  onSelectFolder,
+  selectedFolderPath
 }: SidebarProps) => {
   const renderTree = (nodes: TreeNode[], depth = 0) =>
     nodes.map((node) => (
       <div key={node.path} className="tree-node" style={{ paddingLeft: depth * 12 }}>
         <div className="tree-row">
           <button
-            className={`tree-entry ${node.type}`}
-            onClick={() => node.type === 'file' && onOpenNote(node.path)}
+            className={`tree-entry ${node.type} ${selectedFolderPath === node.path ? 'selected' : ''}`}
+            onClick={() => {
+              if (node.type === 'file') {
+                onOpenNote(node.path);
+              } else {
+                onSelectFolder(node.path);
+              }
+            }}
           >
             {node.name}
           </button>
