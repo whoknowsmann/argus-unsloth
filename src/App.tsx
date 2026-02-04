@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent
+} from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -24,6 +33,14 @@ type SearchResult = {
 };
 
 type ViewMode = 'split' | 'editor' | 'preview';
+type PaletteMode = 'command' | 'open-note' | 'create-note';
+
+type CommandItem = {
+  id: string;
+  label: string;
+  description: string;
+  onSelect: () => void;
+};
 
 const normalizeTitle = (value: string) => value.trim().toLowerCase();
 const wikiRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
@@ -53,12 +70,268 @@ const noteTitleFromPath = (filePath: string) => {
   return fileName.replace(/\.md$/i, '');
 };
 
+const getParentFolder = (filePath: string) => filePath.split(/[/\\]/).slice(0, -1).join('/');
+
+const formatDailyTitle = (date = new Date()) => date.toISOString().slice(0, 10);
+
+const fuzzyScore = (query: string, target: string) => {
+  const normalizedQuery = query.toLowerCase().trim();
+  if (!normalizedQuery) {
+    return 1;
+  }
+  const normalizedTarget = target.toLowerCase();
+  let score = 0;
+  let lastMatch = -1;
+  for (const char of normalizedQuery) {
+    const index = normalizedTarget.indexOf(char, lastMatch + 1);
+    if (index === -1) {
+      return 0;
+    }
+    score += index === lastMatch + 1 ? 2 : 1;
+    lastMatch = index;
+  }
+  return score / normalizedTarget.length;
+};
+
+const CommandPalette = memo(
+  ({
+    open,
+    onClose,
+    onOpenNote,
+    onCreateNote,
+    onTogglePreview,
+    onToggleSplit,
+    onOpenDaily
+  }: {
+    open: boolean;
+    onClose: () => void;
+    onOpenNote: (path: string) => void;
+    onCreateNote: (title: string) => Promise<void>;
+    onTogglePreview: () => void;
+    onToggleSplit: () => void;
+    onOpenDaily: () => Promise<void>;
+  }) => {
+    const [mode, setMode] = useState<PaletteMode>('command');
+    const [query, setQuery] = useState('');
+    const [noteResults, setNoteResults] = useState<SearchResult[]>([]);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const inputRef = useRef<HTMLInputElement | null>(null);
+
+    const resetPalette = useCallback(() => {
+      setMode('command');
+      setQuery('');
+      setNoteResults([]);
+      setActiveIndex(0);
+    }, []);
+
+    const switchMode = useCallback((nextMode: PaletteMode) => {
+      setMode(nextMode);
+      setQuery('');
+      setNoteResults([]);
+      setActiveIndex(0);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    }, []);
+
+    useEffect(() => {
+      if (open) {
+        resetPalette();
+        window.setTimeout(() => inputRef.current?.focus(), 0);
+      }
+    }, [open, resetPalette]);
+
+    useEffect(() => {
+      if (!open || mode !== 'open-note') {
+        return;
+      }
+      if (!query.trim()) {
+        setNoteResults([]);
+        return;
+      }
+      const timeout = window.setTimeout(async () => {
+        const results = await window.vaultApi.searchTitles(query);
+        setNoteResults(results as SearchResult[]);
+        setActiveIndex(0);
+      }, 200);
+      return () => window.clearTimeout(timeout);
+    }, [open, mode, query]);
+
+    const commandItems = useMemo<CommandItem[]>(() => {
+      const items: CommandItem[] = [
+        {
+          id: 'open-note',
+          label: 'Open Note',
+          description: 'Quick switcher for notes',
+          onSelect: () => switchMode('open-note')
+        },
+        {
+          id: 'create-note',
+          label: 'Create Note',
+          description: 'Create a new note in the vault',
+          onSelect: () => switchMode('create-note')
+        },
+        {
+          id: 'toggle-preview',
+          label: 'Toggle Preview',
+          description: 'Switch between preview and split',
+          onSelect: () => {
+            onTogglePreview();
+            onClose();
+          }
+        },
+        {
+          id: 'toggle-split',
+          label: 'Toggle Split View',
+          description: 'Switch between split and editor',
+          onSelect: () => {
+            onToggleSplit();
+            onClose();
+          }
+        },
+        {
+          id: 'daily-note',
+          label: 'Open Daily Note',
+          description: 'Open today’s daily note',
+          onSelect: async () => {
+            await onOpenDaily();
+            onClose();
+          }
+        }
+      ];
+      if (!query.trim()) {
+        return items;
+      }
+      return items
+        .map((item) => ({
+          item,
+          score: fuzzyScore(query, `${item.label} ${item.description}`)
+        }))
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(({ item }) => item);
+    }, [query, onClose, onOpenDaily, onTogglePreview, onToggleSplit, switchMode]);
+
+    const activeItems = mode === 'command' ? commandItems : noteResults;
+    const activeCount = activeItems.length;
+
+    const handleKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setActiveIndex((prev) => (prev + 1) % Math.max(activeCount, 1));
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setActiveIndex((prev) => (prev - 1 + Math.max(activeCount, 1)) % Math.max(activeCount, 1));
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (mode !== 'command') {
+          setMode('command');
+          setQuery('');
+          setNoteResults([]);
+          setActiveIndex(0);
+          return;
+        }
+        onClose();
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        if (mode === 'command') {
+          const target = commandItems[activeIndex];
+          target?.onSelect();
+          return;
+        }
+        if (mode === 'open-note') {
+          const target = noteResults[activeIndex];
+          if (target) {
+            onOpenNote(target.path);
+            onClose();
+          }
+          return;
+        }
+        if (mode === 'create-note' && query.trim()) {
+          void onCreateNote(query.trim()).then(onClose);
+        }
+      }
+    };
+
+    if (!open) {
+      return null;
+    }
+
+    return (
+      <div className="palette-overlay" onClick={onClose}>
+        <div className="palette" onClick={(event) => event.stopPropagation()}>
+          <div className="palette-header">
+            <span className="palette-mode">
+              {mode === 'command' && 'Commands'}
+              {mode === 'open-note' && 'Open Note'}
+              {mode === 'create-note' && 'Create Note'}
+            </span>
+            <span className="palette-hint">Esc to close</span>
+          </div>
+          <input
+            ref={inputRef}
+            className="palette-input"
+            placeholder={
+              mode === 'command'
+                ? 'Type a command...'
+                : mode === 'open-note'
+                ? 'Search notes...'
+                : 'New note title...'
+            }
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+          <div className="palette-list">
+            {mode === 'command' &&
+              commandItems.map((item, index) => (
+                <button
+                  key={item.id}
+                  className={`palette-item ${index === activeIndex ? 'active' : ''}`}
+                  onClick={item.onSelect}
+                >
+                  <div className="palette-item-title">{item.label}</div>
+                  <div className="palette-item-desc">{item.description}</div>
+                </button>
+              ))}
+            {mode === 'open-note' &&
+              noteResults.map((result, index) => (
+                <button
+                  key={result.id}
+                  className={`palette-item ${index === activeIndex ? 'active' : ''}`}
+                  onClick={() => {
+                    onOpenNote(result.path);
+                    onClose();
+                  }}
+                >
+                  <div className="palette-item-title">{result.title}</div>
+                  <div className="palette-item-desc">{result.path}</div>
+                </button>
+              ))}
+            {mode === 'create-note' && (
+              <div className="palette-empty">
+                Press Enter to create <strong>{query.trim() || 'a new note'}</strong>.
+              </div>
+            )}
+            {mode !== 'create-note' && activeCount === 0 && (
+              <div className="palette-empty">No results.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
+
 const App = () => {
   const [vaultPath, setVaultPath] = useState<string | null>(null);
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [openNotes, setOpenNotes] = useState<OpenNote[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('split');
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [lastUsedFolder, setLastUsedFolder] = useState<string | null>(null);
   const [backlinks, setBacklinks] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -95,6 +368,7 @@ const App = () => {
       const newNote: OpenNote = { path: filePath, title, content, dirty: false };
       setOpenNotes((prev) => [...prev, newNote]);
       setActivePath(filePath);
+      setLastUsedFolder(getParentFolder(filePath));
     },
     [openNotes]
   );
@@ -117,6 +391,30 @@ const App = () => {
     },
     [openNoteByPath, vaultPath, loadTree]
   );
+
+  const createNoteWithTitle = useCallback(
+    async (title: string) => {
+      if (!vaultPath) {
+        return;
+      }
+      const existing = await window.vaultApi.openByTitle(normalizeTitle(title));
+      if (existing) {
+        await openNoteByPath(existing);
+        return;
+      }
+      const basePath = lastUsedFolder ?? vaultPath;
+      const filePath = `${basePath}/${title}.md`;
+      await window.vaultApi.createFile(filePath, `# ${title}\n`);
+      await loadTree();
+      await openNoteByPath(filePath);
+    },
+    [vaultPath, lastUsedFolder, loadTree, openNoteByPath]
+  );
+
+  const openDailyNote = useCallback(async () => {
+    const title = formatDailyTitle();
+    await createNoteWithTitle(title);
+  }, [createNoteWithTitle]);
 
   const scheduleSave = useCallback((notePath: string, content: string) => {
     const existing = saveTimeouts.current.get(notePath);
@@ -167,6 +465,7 @@ const App = () => {
     if (type === 'file') {
       await window.vaultApi.createFile(targetPath, `# ${name}\n`);
       await openNoteByPath(targetPath);
+      setLastUsedFolder(getParentFolder(targetPath));
     } else {
       await window.vaultApi.createFolder(targetPath);
     }
@@ -228,6 +527,26 @@ const App = () => {
     }, 300);
     return () => window.clearTimeout(timeout);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const handler = (event: globalThis.KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if ((event.metaKey || event.ctrlKey) && key === 'p') {
+        event.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const togglePreview = useCallback(() => {
+    setViewMode((prev) => (prev === 'preview' ? 'split' : 'preview'));
+  }, []);
+
+  const toggleSplit = useCallback(() => {
+    setViewMode((prev) => (prev === 'split' ? 'editor' : 'split'));
+  }, []);
 
   const markdownContent = useMemo(() => {
     if (!activeNote) {
@@ -408,6 +727,15 @@ const App = () => {
           </div>
         </aside>
       </div>
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onOpenNote={openNoteByPath}
+        onCreateNote={createNoteWithTitle}
+        onTogglePreview={togglePreview}
+        onToggleSplit={toggleSplit}
+        onOpenDaily={openDailyNote}
+      />
     </div>
   );
 };

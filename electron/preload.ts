@@ -12,6 +12,7 @@ const api = {
   renameEntry: (sourcePath: string, targetPath: string) => ipcRenderer.invoke('entry:rename', sourcePath, targetPath),
   deleteEntry: (targetPath: string) => ipcRenderer.invoke('entry:delete', targetPath),
   search: (query: string) => ipcRenderer.invoke('search:query', query),
+  searchTitles: (query: string) => ipcRenderer.invoke('note:searchTitles', query),
   openByTitle: (title: string) => ipcRenderer.invoke('note:openByTitle', title),
   noteExists: (title: string) => ipcRenderer.invoke('note:exists', title),
   getBacklinks: (filePath: string) => ipcRenderer.invoke('backlinks:get', filePath),
